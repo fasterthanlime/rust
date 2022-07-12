@@ -2121,8 +2121,11 @@ impl<'cx, 'tcx> ProjectionCacheKeyExt<'cx, 'tcx> for ProjectionCacheKey<'tcx> {
         predicate: ty::PolyProjectionPredicate<'tcx>,
     ) -> Option<Self> {
         let infcx = selcx.infcx();
+
         // We don't do cross-snapshot caching of obligations with escaping regions,
         // so there's no cache key to use
+
+        // Old:
         predicate.no_bound_vars().map(|predicate| {
             ProjectionCacheKey::new(
                 // We don't attempt to match up with a specific type-variable state
@@ -2132,5 +2135,16 @@ impl<'cx, 'tcx> ProjectionCacheKeyExt<'cx, 'tcx> for ProjectionCacheKey<'tcx> {
                 infcx.resolve_vars_if_possible(predicate.projection_ty),
             )
         })
+
+        // New:
+        // Some(predicate.skip_binder()).map(|predicate| {
+        //     ProjectionCacheKey::new(
+        //         // We don't attempt to match up with a specific type-variable state
+        //         // from a specific call to `opt_normalize_projection_type` - if
+        //         // there's no precise match, the original cache entry is "stranded"
+        //         // anyway.
+        //         infcx.resolve_vars_if_possible(predicate.projection_ty),
+        //     )
+        // })
     }
 }

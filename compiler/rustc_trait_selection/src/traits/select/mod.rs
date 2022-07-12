@@ -441,6 +441,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         previous_stack: TraitObligationStackList<'o, 'tcx>,
         obligation: PredicateObligation<'tcx>,
     ) -> Result<EvaluationResult, OverflowError> {
+        let _prof_timer = self.infcx.tcx.prof.generic_activity_with_arg_recorder("evaluate_predicate_recursively", |recorder| {
+            recorder.record_arg(format!("{:?}", obligation));
+        });
+
         // `previous_stack` stores a `TraitObligation`, while `obligation` is
         // a `PredicateObligation`. These are distinct types, so we can't
         // use any `Option` combinator method that would force them to be
