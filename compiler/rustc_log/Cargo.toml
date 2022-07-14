@@ -6,8 +6,18 @@ edition = "2021"
 [dependencies]
 atty = "0.2"
 tracing = "0.1.28"
-tracing-subscriber = { version = "0.3.3", default-features = false, features = ["fmt", "env-filter", "smallvec", "parking_lot", "ansi"] }
+tracing-subscriber = { version = "0.3.3", default-features = false, features = [
+	"fmt",
+	"env-filter",
+	"smallvec",
+	"parking_lot",
+	"ansi",
+] }
 tracing-tree = "0.2.0"
+tracing-opentelemetry = { version = "0.17.4" }
+opentelemetry-jaeger = { version = "0.16.0", features = [
+	"reqwest_blocking_collector_client",
+] }
 
 [dev-dependencies]
 rustc_span = { path = "../rustc_span" }

@@ -56,35 +56,47 @@ pub fn init_env_logger(env: &str) -> Result<(), Error> {
         _ => EnvFilter::default().add_directive(Directive::from(LevelFilter::WARN)),
     };
 
-    let color_logs = match env::var(String::from(env) + "_COLOR") {
-        Ok(value) => match value.as_ref() {
-            "always" => true,
-            "never" => false,
-            "auto" => stderr_isatty(),
-            _ => return Err(Error::InvalidColorValue(value)),
-        },
-        Err(VarError::NotPresent) => stderr_isatty(),
-        Err(VarError::NotUnicode(_value)) => return Err(Error::NonUnicodeColorValue),
-    };
+    if env::var("RUSTC_JAEGER").is_ok() {
+        let tracer = opentelemetry_jaeger::new_pipeline()
+            .with_service_name("rustc")
+            .with_collector_endpoint("http://localhost:14268/api/traces")
+            .install_simple().unwrap();
 
-    let verbose_entry_exit = match env::var_os(String::from(env) + "_ENTRY_EXIT") {
-        None => false,
-        Some(v) => &v != "0",
-    };
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
-    let layer = tracing_tree::HierarchicalLayer::default()
-        .with_writer(io::stderr)
-        .with_indent_lines(true)
-        .with_ansi(color_logs)
-        .with_targets(true)
-        .with_verbose_exit(verbose_entry_exit)
-        .with_verbose_entry(verbose_entry_exit)
-        .with_indent_amount(2);
-    #[cfg(parallel_compiler)]
-    let layer = layer.with_thread_ids(true).with_thread_names(true);
+        let subscriber = tracing_subscriber::Registry::default().with(filter).with(telemetry);
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+    } else {
+        let color_logs = match env::var(String::from(env) + "_COLOR") {
+            Ok(value) => match value.as_ref() {
+                "always" => true,
+                "never" => false,
+                "auto" => stderr_isatty(),
+                _ => return Err(Error::InvalidColorValue(value)),
+            },
+            Err(VarError::NotPresent) => stderr_isatty(),
+            Err(VarError::NotUnicode(_value)) => return Err(Error::NonUnicodeColorValue),
+        };
 
-    let subscriber = tracing_subscriber::Registry::default().with(filter).with(layer);
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+        let verbose_entry_exit = match env::var_os(String::from(env) + "_ENTRY_EXIT") {
+            None => false,
+            Some(v) => &v != "0",
+        };
+
+        let layer = tracing_tree::HierarchicalLayer::default()
+            .with_writer(io::stderr)
+            .with_indent_lines(true)
+            .with_ansi(color_logs)
+            .with_targets(true)
+            .with_verbose_exit(verbose_entry_exit)
+            .with_verbose_entry(verbose_entry_exit)
+            .with_indent_amount(2);
+        #[cfg(parallel_compiler)]
+        let layer = layer.with_thread_ids(true).with_thread_names(true);
+
+        let subscriber = tracing_subscriber::Registry::default().with(filter).with(layer);
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+    }
 
     Ok(())
 }
