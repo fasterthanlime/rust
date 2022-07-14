@@ -18,6 +18,7 @@ tracing-opentelemetry = { version = "0.17.4" }
 opentelemetry-jaeger = { version = "0.16.0", features = [
 	"reqwest_blocking_collector_client",
 ] }
+tracing-report = { git = "https://github.com/tosc-rs/tracing-report", rev = "e132c9b1d00d9eca67a02800e9d2d6e8e66b722d" }
 
 [dev-dependencies]
 rustc_span = { path = "../rustc_span" }

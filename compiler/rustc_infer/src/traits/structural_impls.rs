@@ -60,7 +60,9 @@ impl<'tcx> fmt::Debug for traits::MismatchedProjectionTypes<'tcx> {
 ///////////////////////////////////////////////////////////////////////////
 // TypeFoldable implementations.
 
-impl<'tcx, O: TypeFoldable<'tcx> + fmt::Display> TypeFoldable<'tcx> for traits::Obligation<'tcx, O> {
+impl<'tcx, O: TypeFoldable<'tcx> + fmt::Display> TypeFoldable<'tcx>
+    for traits::Obligation<'tcx, O>
+{
     fn try_fold_with<F: FallibleTypeFolder<'tcx>>(self, folder: &mut F) -> Result<Self, F::Error> {
         Ok(traits::Obligation {
             cause: self.cause,
@@ -71,7 +73,9 @@ impl<'tcx, O: TypeFoldable<'tcx> + fmt::Display> TypeFoldable<'tcx> for traits::
     }
 }
 
-impl<'tcx, O: TypeVisitable<'tcx> + fmt::Display> TypeVisitable<'tcx> for traits::Obligation<'tcx, O> {
+impl<'tcx, O: TypeVisitable<'tcx> + fmt::Display> TypeVisitable<'tcx>
+    for traits::Obligation<'tcx, O>
+{
     fn visit_with<V: TypeVisitor<'tcx>>(&self, visitor: &mut V) -> ControlFlow<V::BreakTy> {
         self.predicate.visit_with(visitor)?;
         self.param_env.visit_with(visitor)

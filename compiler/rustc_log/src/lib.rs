@@ -60,11 +60,15 @@ pub fn init_env_logger(env: &str) -> Result<(), Error> {
         let tracer = opentelemetry_jaeger::new_pipeline()
             .with_service_name("rustc")
             .with_collector_endpoint("http://localhost:14268/api/traces")
-            .install_simple().unwrap();
+            .install_simple()
+            .unwrap();
 
         let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
         let subscriber = tracing_subscriber::Registry::default().with(filter).with(telemetry);
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+    } else if env::var("RUSTC_REPORT").is_ok() {
+        let subscriber = tracing_subscriber::Registry::default().with(filter).with(tracing_report::ReportLayer);
         tracing::subscriber::set_global_default(subscriber).unwrap();
     } else {
         let color_logs = match env::var(String::from(env) + "_COLOR") {

@@ -18,9 +18,9 @@ const LICENSES: &[&str] = &[
     "ISC",
     "Unlicense/MIT",
     "Unlicense OR MIT",
-    "0BSD OR MIT OR Apache-2.0", // adler license
-    "Zlib OR Apache-2.0 OR MIT", // tinyvec
-    "Apache-2.0", // opentelemetry / thrift
+    "0BSD OR MIT OR Apache-2.0",            // adler license
+    "Zlib OR Apache-2.0 OR MIT",            // tinyvec
+    "Apache-2.0",                           // opentelemetry / thrift
     "(Apache-2.0 OR MIT) AND BSD-3-Clause", // encoding_rs
 ];
 
@@ -256,7 +256,6 @@ const PERMITTED_DEPENDENCIES: &[&str] = &[
     // this is a false-positive: it's only used by rustfmt, but because it's enabled through a
     // feature, tidy thinks it's used by rustc as well.
     "yansi-term",
-
     // opentelemetry additions (yolo)
     "async-trait",
     "base64",
