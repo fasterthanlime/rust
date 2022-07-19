@@ -250,6 +250,10 @@ pub fn prepare_tool_cargo(
         }
     }
 
+    // cargo doesn't set this env var yet, but it's needed by expect-test
+    // to build correct absolute paths for test_data files
+    cargo.env("CARGO_WORKSPACE_DIR", &dir);
+
     // clippy tests need to know about the stage sysroot. Set them consistently while building to
     // avoid rebuilding when running tests.
     cargo.env("SYSROOT", builder.sysroot(compiler));
