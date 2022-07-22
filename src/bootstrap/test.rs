@@ -388,7 +388,7 @@ impl Step for RustAnalyzer {
             "test",
             path,
             SourceType::InTree,
-            &["rust-analyzer/in-rust-tree".to_owned(), "sourcegen/in-rust-tree".to_owned()],
+            &["rust-analyzer/in-rust-tree".to_owned()],
         );
 
         let dir = builder.src.join(path);

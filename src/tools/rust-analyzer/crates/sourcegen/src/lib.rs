@@ -9,14 +9,10 @@
 #![warn(rust_2018_idioms, unused_lifetimes, semicolon_in_expressions_from_macros)]
 
 use std::{
-    fmt, mem,
+    fmt, fs, mem,
     path::{Path, PathBuf},
 };
 
-#[cfg(not(feature = "in-rust-tree"))]
-use std::fs;
-
-#[cfg(not(feature = "in-rust-tree"))]
 use xshell::{cmd, Shell};
 
 pub fn list_rust_files(dir: &Path) -> Vec<PathBuf> {
@@ -139,13 +135,6 @@ impl fmt::Display for Location {
     }
 }
 
-#[cfg(feature = "in-rust-tree")]
-pub fn reformat(text: String) -> String {
-    // the stable toolchain is not installed in rust CI
-    text
-}
-
-#[cfg(not(feature = "in-rust-tree"))]
 fn ensure_rustfmt(sh: &Shell) {
     let version = cmd!(sh, "rustfmt --version").read().unwrap_or_default();
     if !version.contains("stable") {
@@ -156,7 +145,6 @@ fn ensure_rustfmt(sh: &Shell) {
     }
 }
 
-#[cfg(not(feature = "in-rust-tree"))]
 pub fn reformat(text: String) -> String {
     let sh = Shell::new().unwrap();
     sh.set_var("RUSTUP_TOOLCHAIN", "stable");
@@ -180,16 +168,6 @@ pub fn add_preamble(generator: &'static str, mut text: String) -> String {
 
 /// Checks that the `file` has the specified `contents`. If that is not the
 /// case, updates the file and then fails the test.
-///
-/// This version is used in `rust-lang/rust` CI and is a no-op
-#[cfg(feature = "in-rust-tree")]
-pub fn ensure_file_contents(file: &Path, contents: &str) {
-    let _ = (file, contents);
-}
-
-/// Checks that the `file` has the specified `contents`. If that is not the
-/// case, updates the file and then fails the test.
-#[cfg(not(feature = "in-rust-tree"))]
 pub fn ensure_file_contents(file: &Path, contents: &str) {
     if let Ok(old_contents) = fs::read_to_string(file) {
         if normalize_newlines(&old_contents) == normalize_newlines(contents) {
@@ -213,7 +191,6 @@ pub fn ensure_file_contents(file: &Path, contents: &str) {
     panic!("some file was not up to date and has been updated, simply re-run the tests");
 }
 
-#[cfg(not(feature = "in-rust-tree"))]
 fn normalize_newlines(s: &str) -> String {
     s.replace("\r\n", "\n")
 }
