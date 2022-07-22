@@ -11,13 +11,7 @@ fn sourcegen_diagnostic_docs() {
         diagnostics.into_iter().map(|it| it.to_string()).collect::<Vec<_>>().join("\n\n");
     let contents = sourcegen::add_preamble("sourcegen_diagnostic_docs", contents);
     let dst = project_root().join("docs/user/generated_diagnostic.adoc");
-    if let Err(e) = fs::write(&dst, contents) {
-        if std::env::var("CI").is_ok() {
-            // ignore failures
-        } else {
-            panic!("failed to write to {:?}: {}", dst, e);
-        }
-    }
+    fs::write(&dst, &contents).unwrap();
 }
 
 #[derive(Debug)]
