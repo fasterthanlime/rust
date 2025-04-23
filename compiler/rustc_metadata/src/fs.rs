@@ -1,8 +1,13 @@
+use std::ops::Deref as _;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use rustc_data_structures::fingerprint::Fingerprint;
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_data_structures::temp_dir::MaybeTempDir;
-use rustc_middle::ty::TyCtxt;
+use rustc_hir::def::DefKind;
+use rustc_hir::def_id::LocalDefId;
+use rustc_middle::ty::{InstanceKind, TyCtxt};
 use rustc_session::config::{CrateType, OutFileName, OutputType};
 use rustc_session::output::filename_for_metadata;
 use rustc_session::{MetadataKind, Session};
@@ -40,6 +45,7 @@ pub fn emit_wrapper_file(
 
 pub fn encode_and_write_metadata(tcx: TyCtxt<'_>) -> (EncodedMetadata, bool) {
     let out_filename = filename_for_metadata(tcx.sess, tcx.output_filenames(()));
+    //let hash = tcx.crate_hash()
     // To avoid races with another rustc process scanning the output directory,
     // we need to write the file somewhere else and atomically move it to its
     // final destination, with an `fs::rename` call. In order for the rename to
@@ -104,7 +110,12 @@ pub fn encode_and_write_metadata(tcx: TyCtxt<'_>) -> (EncodedMetadata, bool) {
             }
         };
         if tcx.sess.opts.json_artifact_notifications {
-            tcx.dcx().emit_artifact_notification(out_filename.as_path(), "metadata");
+            let hash = public_api_hash(tcx);
+            tcx.dcx().emit_artifact_notification(
+                out_filename.as_path(),
+                "metadata",
+                Some(&hash.to_string()),
+            );
         }
         (filename, None)
     } else {
@@ -146,4 +157,88 @@ pub fn copy_to_stdout(from: &Path) -> io::Result<()> {
     let mut stdout = io::stdout();
     io::copy(&mut reader, &mut stdout)?;
     Ok(())
+}
+
+fn public_api_hash(tcx: TyCtxt<'_>) -> Fingerprint {
+    let mut stable_hasher = StableHasher::new();
+    tcx.with_stable_hashing_context(|mut hcx| {
+        hcx.while_hashing_spans(false, |mut hcx| {
+            let _ = tcx
+                .reachable_set(())
+                .to_sorted(hcx, true)
+                .into_iter()
+                .filter_map(|local_def_id: &LocalDefId| {
+                    let def_id = local_def_id.to_def_id();
+
+                    let item = tcx.hir_node_by_def_id(*local_def_id);
+                    let _ = item.ident()?;
+                    let has_hir_body = item.body_id().is_some();
+
+                    let item_path = tcx.def_path(def_id);
+                    let def_kind = tcx.def_kind(def_id);
+                    let mut fn_sig = None;
+                    item_path.to_string_no_crate_verbose().hash_stable(hcx, &mut stable_hasher);
+                    let has_mir = match def_kind {
+                        DefKind::Ctor(_, _)
+                        | DefKind::AnonConst
+                        | DefKind::InlineConst
+                        | DefKind::AssocConst
+                        | DefKind::Const
+                        | DefKind::SyntheticCoroutineBody => has_hir_body,
+                        DefKind::AssocFn | DefKind::Fn | DefKind::Closure => {
+                            fn_sig = Some(tcx.fn_sig(def_id));
+                            if def_kind == DefKind::Closure && tcx.is_coroutine(def_id) {
+                                has_hir_body
+                            } else {
+                                let generics = tcx.generics_of(def_id);
+                                has_hir_body
+                                    && (tcx.sess.opts.unstable_opts.always_encode_mir
+                                        || (tcx.sess.opts.output_types.should_codegen()
+                                            && (generics.requires_monomorphization(tcx)
+                                                || tcx.cross_crate_inlinable(def_id))))
+                            }
+                        }
+                        _ => {
+                            return None;
+                        }
+                    };
+
+                    if let Some(sig) = fn_sig {
+                        sig.skip_binder().hash_stable(hcx, &mut stable_hasher);
+                    }
+                    if !has_mir {
+                        return Some(());
+                    }
+
+                    let ty = tcx.type_of(def_id);
+
+                    let body = tcx.instance_mir(InstanceKind::Item(def_id));
+                    let blocks = body.basic_blocks.deref();
+
+                    // Deref to avoid hashing cache of mir body.
+                    let _ = blocks
+                        .iter()
+                        .map(|bb| {
+                            let kind =
+                                bb.terminator.as_ref().map(|terminator| terminator.kind.clone());
+                            let statements = bb
+                                .statements
+                                .iter()
+                                .map(|statement| statement.kind.clone())
+                                .collect::<Vec<_>>();
+
+                            (bb.is_cleanup, kind, statements)
+                                .hash_stable(&mut hcx, &mut stable_hasher);
+                            ()
+                        })
+                        .collect::<Vec<_>>();
+
+                    ty.skip_binder().kind().hash_stable(&mut hcx, &mut stable_hasher);
+
+                    Some(())
+                })
+                .collect::<Vec<_>>();
+        });
+        stable_hasher.finish()
+    })
 }
